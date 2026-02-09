@@ -1,0 +1,17 @@
+=== Outgoing Links Stats ===
+{'average': 31.173673503983725, 'median': 0.0, 'min': 0.0, 'max': 375.0, 'quintiles_20_40_60_80': [0.0, 0.0, 0.0, 0.0]}
+
+=== Incoming Links Stats ===
+{'average': 18.391337514833022, 'median': 18.0, 'min': 5.0, 'max': 38.0, 'quintiles_20_40_60_80': [15.0, 17.0, 19.0, 22.0]}
+
+=== PageRank (iterations=200) Top 5 ===
+1574	0.0001622296
+8970	0.0001617395
+4844	0.0001600199
+318	0.0001587543
+11446	0.0001582581
+
+=== Timing ===
+Read/build graph: 1403.68s
+PageRank compute: 15.23s
+Total:           1418.91s
