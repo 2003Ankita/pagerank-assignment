@@ -16,8 +16,6 @@ pagerank-assignment/
 - **Region**: us-central1
 - **Data prefix**: webgraph/
 
-
-
 ## Setup Instructions
 
 Follow the steps below to set up and run the project.
@@ -35,8 +33,8 @@ pip install -r requirements.txt
 ### Run tests
 Run all unit tests using pytest:
 pytest
-This will execute the tests in the tests/ directory and verify the correctness
-of the PageRank implementation.
+This runs the tests in the tests/ directory and verifies correctness on a
+small deterministic graph (independent of the randomly generated 20K files).
 
 ## Run PageRank on GCS data
 To execute the PageRank algorithm, run the following command from the project root:
@@ -46,6 +44,11 @@ PYTHONPATH=. python -m pagerank_gcs.main \
   --prefix webgraph/ \
   --limit 20000
 
+Parameter meanings
+--bucket : Name of the GCS bucket containing the HTML files
+--prefix : Directory inside the bucket where HTML files are stored
+--limit : Maximum number of HTML files to process (optional, speeds up testing)
+
 The bucket was made world-readable so TAs can access the data:
 ```bash
 gsutil iam ch allUsers:objectViewer gs://pagerank-bu-ap178152
@@ -54,4 +57,3 @@ We implemented the original iterative PageRank algorithm:
 PR(A) = 0.15 / N + 0.85 * Σ (PR(T) / C(T))
 - Iteration stops when total PageRank changes by less than **0.5%**
 - Dangling nodes (pages with zero outgoing links) are handled by redistributing their rank uniformly
-
