@@ -1,0 +1,10 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+
+# Local outputs
+cloudshell_output_*.txt
