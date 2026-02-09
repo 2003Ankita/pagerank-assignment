@@ -8,3 +8,4 @@ venv/
 
 # Local outputs
 cloudshell_output_*.txt
+webgraph_v2_local/
