@@ -19,6 +19,7 @@ def list_html_objects_public(bucket: str, prefix: str, limit: Optional[int] = No
     List .html objects under prefix in a public GCS bucket using the Python SDK.
     Returns object names like: 'webgraph_v2/0.html'
     """
+    print(f"[list] bucket={bucket}, prefix={prefix}")
     bucket_ref = _GCS_CLIENT.bucket(bucket)
 
     names: List[str] = []
@@ -31,6 +32,8 @@ def list_html_objects_public(bucket: str, prefix: str, limit: Optional[int] = No
 
     if limit:
         names = names[:limit]
+
+    print(f"[list] found {len(names)} html files in {time.time() - start:.2f}s")
     return names
 
 def download_object_public(bucket: str, object_name: str) -> bytes:
@@ -68,7 +71,7 @@ def download_object_public(bucket: str, object_name: str) -> bytes:
                 raise
 
         time.sleep(2 ** attempt)
-
+    print(f"[download] giving up on {object_name}")
     raise last_exc if last_exc else RuntimeError("Download failed with unknown error")
 
 def _fetch_and_parse(bucket: str, name: str) -> tuple[int, List[int]]:
@@ -104,7 +107,7 @@ def read_graph_from_gcs(
                 fail += 1
 
     print(f"[read_graph_from_gcs] failed downloads: {fail}/{len(object_names)}")
-
+    print("[graph] computing in-degree / out-degree")
     for src in range(n):
         for dst in outlinks[src]:
             if 0 <= dst < n:
