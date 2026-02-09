@@ -4,10 +4,12 @@ This repository contains an implementation of the PageRank algorithm using a
 graph representation along with supporting statistics and unit tests.
 
 ## Project Structure
+```text
 pagerank-assignment/
-├── pagerank_gcs/ # PageRank implementation (graph, stats, algorithm)
-├── tests/ # Pytest unit tests
-├── requirements.txt # Python dependencies
+├── pagerank_gcs/     # PageRank implementation (graph, stats, algorithm)
+├── tests/            # Pytest unit tests
+└── requirements.txt # Python dependencies
+
 
 
 ## Setup Instructions
