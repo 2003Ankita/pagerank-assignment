@@ -1,9 +1,10 @@
 import re
+import time
+import requests
 import subprocess
 from typing import Dict, List, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import requests
 
 HREF_RE = re.compile(r'HREF="(\d+)\.html"', re.IGNORECASE)
 
@@ -20,11 +21,43 @@ def list_html_objects_public(bucket: str, prefix: str, limit: Optional[int] = No
         names = names[:limit]
     return names
 
+
+
 def download_object_public(bucket: str, object_name: str) -> bytes:
     url = f"https://storage.googleapis.com/{bucket}/{object_name}"
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
-    return resp.content
+
+    connect_timeout = 10
+    read_timeout = 120
+    retries = 5
+
+    last_exc = None
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, timeout=(connect_timeout, read_timeout))
+
+            # Retry only for throttling / transient server errors
+            if resp.status_code in (429, 500, 502, 503, 504):
+                raise requests.exceptions.HTTPError(f"HTTP {resp.status_code}", response=resp)
+
+            resp.raise_for_status()
+            return resp.content
+
+        except (requests.exceptions.ReadTimeout,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ChunkedEncodingError) as e:
+            last_exc = e
+
+        except requests.exceptions.HTTPError as e:
+            last_exc = e
+            # if it's NOT retryable, fail immediately
+            code = getattr(e.response, "status_code", None)
+            if code not in (429, 500, 502, 503, 504):
+                raise
+
+        time.sleep(2 ** attempt)
+
+    raise last_exc
+
 
 def _fetch_and_parse(bucket: str, name: str) -> tuple[int, List[int]]:
     pid = int(name.split("/")[-1].replace(".html", ""))
@@ -35,7 +68,7 @@ def read_graph_from_gcs(
     bucket: str,
     prefix: str,
     limit: Optional[int] = None,
-    workers: int = 64,
+    workers: int = 12,
 ) -> Tuple[Dict[int, List[int]], Dict[int, int], Dict[int, int]]:
 
     object_names = list_html_objects_public(bucket, prefix, limit=limit)
@@ -52,9 +85,15 @@ def read_graph_from_gcs(
     # ---- PARALLEL DOWNLOAD + PARSE ----
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = [ex.submit(_fetch_and_parse, bucket, name) for name in object_names]
+        fail = 0
         for fut in as_completed(futures):
-            pid, links = fut.result()
-            outlinks[pid] = links
+            try:
+                pid, links = fut.result()
+                outlinks[pid] = links
+            except Exception as e:
+                fail += 1
+        print(f"[read_graph_from_gcs] failed downloads: {fail}/{len(object_names)}")
+
 
     # degrees
     for src in range(n):
