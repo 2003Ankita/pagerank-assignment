@@ -1,36 +1,50 @@
 import re
 import time
 import requests
-import subprocess
 from typing import Dict, List, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from google.cloud import storage
 
 HREF_RE = re.compile(r'HREF="(\d+)\.html"', re.IGNORECASE)
+
+_GCS_CLIENT = storage.Client.create_anonymous_client()
 
 def parse_outgoing_links(html_bytes: bytes) -> List[int]:
     text = html_bytes.decode("utf-8", errors="ignore")
     return [int(m.group(1)) for m in HREF_RE.finditer(text)]
 
 def list_html_objects_public(bucket: str, prefix: str, limit: Optional[int] = None) -> List[str]:
-    cmd = ["gsutil", "ls", f"gs://{bucket}/{prefix}*.html"]
-    out = subprocess.check_output(cmd, text=True)
-    names = [line.strip().replace(f"gs://{bucket}/", "") for line in out.splitlines()]
-    names.sort(key=lambda s: int(s.split("/")[-1].replace(".html", "")))  # stable order
+    """
+    List .html objects under prefix in a public GCS bucket using the Python SDK.
+    Returns object names like: 'webgraph_v2/0.html'
+    """
+    bucket_ref = _GCS_CLIENT.bucket(bucket)
+
+    names: List[str] = []
+    for blob in bucket_ref.list_blobs(prefix=prefix):
+        if blob.name.endswith(".html"):
+            names.append(blob.name)
+
+    # stable numeric order by filename (0.html, 1.html, ...)
+    names.sort(key=lambda s: int(s.split("/")[-1].replace(".html", "")))
+
     if limit:
         names = names[:limit]
     return names
 
-
-
 def download_object_public(bucket: str, object_name: str) -> bytes:
+    """
+    Download a public object via HTTPS with retries and backoff.
+    (Keeps your original approach; only listing is via SDK.)
+    """
     url = f"https://storage.googleapis.com/{bucket}/{object_name}"
 
     connect_timeout = 10
     read_timeout = 120
     retries = 5
 
-    last_exc = None
+    last_exc: Optional[Exception] = None
     for attempt in range(retries):
         try:
             resp = requests.get(url, timeout=(connect_timeout, read_timeout))
@@ -49,15 +63,13 @@ def download_object_public(bucket: str, object_name: str) -> bytes:
 
         except requests.exceptions.HTTPError as e:
             last_exc = e
-            # if it's NOT retryable, fail immediately
             code = getattr(e.response, "status_code", None)
             if code not in (429, 500, 502, 503, 504):
                 raise
 
         time.sleep(2 ** attempt)
 
-    raise last_exc
-
+    raise last_exc if last_exc else RuntimeError("Download failed with unknown error")
 
 def _fetch_and_parse(bucket: str, name: str) -> tuple[int, List[int]]:
     pid = int(name.split("/")[-1].replace(".html", ""))
@@ -75,14 +87,12 @@ def read_graph_from_gcs(
     if not object_names:
         raise RuntimeError("No HTML files found")
 
-    # N should be count of pages we are processing (limit-aware)
     page_ids = [int(n.split("/")[-1].replace(".html", "")) for n in object_names]
-    n = max(page_ids) + 1   # assumes ids are 0..max; ok for your generator
+    n = max(page_ids) + 1  # assumes ids are 0..max
 
     outlinks: Dict[int, List[int]] = {i: [] for i in range(n)}
     in_degree: Dict[int, int] = {i: 0 for i in range(n)}
 
-    # ---- PARALLEL DOWNLOAD + PARSE ----
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = [ex.submit(_fetch_and_parse, bucket, name) for name in object_names]
         fail = 0
@@ -90,12 +100,11 @@ def read_graph_from_gcs(
             try:
                 pid, links = fut.result()
                 outlinks[pid] = links
-            except Exception as e:
+            except Exception:
                 fail += 1
-        print(f"[read_graph_from_gcs] failed downloads: {fail}/{len(object_names)}")
 
+    print(f"[read_graph_from_gcs] failed downloads: {fail}/{len(object_names)}")
 
-    # degrees
     for src in range(n):
         for dst in outlinks[src]:
             if 0 <= dst < n:
