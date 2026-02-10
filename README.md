@@ -14,7 +14,7 @@ pagerank-assignment/
 - **GCP Project ID**: sustained-flow-485619-g3
 - **GCS Bucket**: pagerank-bu-ap178152
 - **Region**: us-central1
-- **Data prefix**: webgraph/
+- **Data prefix**: webgraph_v2/
 
 ## Setup Instructions
 
@@ -25,6 +25,10 @@ Clone the repository from GitHub and move into the project directory:
 ```bash
 git clone https://github.com/2003Ankita/pagerank-assignment.git
 cd pagerank-assignment
+
+### Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
 ### Install dependencies
 Install the required Python packages listed in requirements.txt:
@@ -40,9 +44,10 @@ small deterministic graph (independent of the randomly generated 20K files).
 To execute the PageRank algorithm, run the following command from the project root:
 ```bash
 PYTHONPATH=. python -m pagerank_gcs.main \
-  --bucket pagerank-bu-ap178152 \
-  --prefix webgraph/ \
-  --limit 20000
+--bucket pagerank-bu-ap178152 \
+--prefix webgraph_v2/ \
+--limit 20000 | tee cloudshell_output_20k.txt
+
 
 Parameter meanings
 --bucket : Name of the GCS bucket containing the HTML files
