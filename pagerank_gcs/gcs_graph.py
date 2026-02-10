@@ -19,6 +19,7 @@ def list_html_objects_public(bucket: str, prefix: str, limit: Optional[int] = No
     List .html objects under prefix in a public GCS bucket using the Python SDK.
     Returns object names like: 'webgraph_v2/0.html'
     """
+    start = time.time()
     print(f"[list] bucket={bucket}, prefix={prefix}")
     bucket_ref = _GCS_CLIENT.bucket(bucket)
 
